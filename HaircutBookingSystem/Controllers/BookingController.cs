@@ -1,86 +1,26 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using HaircutBookingSystem.Data;
 using HaircutBookingSystem.Models;
-using HaircutBookingSystem.Services;      // <-- IEmailSender lives here
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
-using Microsoft.Extensions.Configuration;
+using Microsoft.EntityFrameworkCore;
 
 namespace HaircutBookingSystem.Controllers
 {
-    /*
-     HOW SMTP PLUGS IN (read this once, then skim the rest)
-     ------------------------------------------------------
-     1) TODAY (no SMTP): We show a confirmation screen only.
-        - appsettings.json has:  "Email": { "Send": false }
-        - Controller reads that flag and SKIPS sending.
-
-     2) WHEN YOU GET AN SMTP PROVIDER (Brevo, Mailjet, Gmail Workspace, SES, etc.):
-        - Put their SMTP settings under "Smtp" in appsettings.json (Host/Port/SSL/Username/Password/FromAddress/FromName).
-        - Flip the switch:  "Email": { "Send": true }
-        - Make sure Program.cs registers SmtpEmailSender as IEmailSender (the earlier guide already showed this).
-          Example in Program.cs:
-              var smtpOptions = builder.Configuration.GetSection("Smtp").Get<SmtpOptions>() ?? new SmtpOptions();
-              builder.Services.AddSingleton(smtpOptions);
-              builder.Services.AddTransient<IEmailSender, SmtpEmailSender>();
-
-     3) OPTIONAL BUT RECOMMENDED:
-        - Add a Reply-To so customers can answer (see comment below near SendAsync).
-        - Store secrets safely (User Secrets in dev, environment variables in prod).
-        - Add SPF/DKIM/DMARC DNS records at your domain so email avoids spam.
-
-     4) EXAMPLE appsettings.json SNIPPET (you can paste into your file and edit):
-        {
-          "Logging": { "LogLevel": { "Default": "Information", "Microsoft.AspNetCore": "Warning" } },
-          "AllowedHosts": "*",
-
-          "Email": { "Send": false },  // <-- set to true when ready to send real emails
-
-          "Smtp": {
-            "Host": "smtp-relay.brevo.com",   // or smtp.gmail.com, smtp.mailjet.com, email-smtp.us-east-1.amazonaws.com, etc.
-            "Port": 587,
-            "UseSsl": true,
-            "Username": "YOUR_SMTP_USERNAME_OR_apikey",
-            "Password": "YOUR_SMTP_PASSWORD_OR_API_KEY",   // store in User Secrets / env var in real life
-            "FromAddress": "noreply@yourdomain.com",
-            "FromName": "Good Vibes Barbershop"
-          }
-        }
-
-     5) WHEN YOU HAVE A DATABASE:
-        - Create and save a Booking record BEFORE sending the email.
-        - Include a confirmation number in the email body (nice touch).
-    */
-
     public class BookingController : Controller
     {
-        private readonly IEmailSender _emailSender;   // <-- This will send real email once Email:Send = true + SMTP is configured
-        private readonly bool _sendEmails;            // <-- Our simple on/off switch from appsettings.json
+        private readonly SalonContext _db;
+        private readonly TimeZoneInfo _localTz =
+            TimeZoneInfo.FindSystemTimeZoneById("Central Standard Time"); // adjust if needed
 
-        // For now we hard-code a few services. Replace with DB later.
-        private static readonly List<Service> _services = new()
-        {
-            new Service { Id = 1, Name = "Haircut",       Price = 25 },
-            new Service { Id = 2, Name = "Hair Styling",  Price = 40 },
-            new Service { Id = 3, Name = "Hair Coloring", Price = 80 },
-            new Service { Id = 4, Name = "Beard Trim",    Price = 15 }
-        };
-
-        public BookingController(IEmailSender emailSender, IConfiguration config)
-        {
-            _emailSender = emailSender;
-
-            // Reads Email:Send from appsettings.json (false = skip sending, true = send via SMTP)
-            // Example: "Email": { "Send": false }
-            _sendEmails = config.GetValue<bool>("Email:Send");
-        }
+        public BookingController(SalonContext db) => _db = db;
 
         [HttpGet]
-        public IActionResult Index()
+        public async Task<IActionResult> Index()
         {
-            ViewBag.ServiceList = new SelectList(_services, nameof(Service.Id), nameof(Service.Name));
+            await LoadDropdowns();
             return View(new BookingRequest());
         }
 
@@ -88,75 +28,127 @@ namespace HaircutBookingSystem.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Index(BookingRequest model)
         {
-            ViewBag.ServiceList = new SelectList(_services, nameof(Service.Id), nameof(Service.Name));
+            await LoadDropdowns(); // repopulate on postback
 
-            if (!ModelState.IsValid)
+            if (!ModelState.IsValid) return View(model);
+
+            // 30-minute boundary enforcement (e.g., 9:00, 9:30, 10:00)
+            var mins = model.Time!.Value.Minutes;
+            var secs = model.Time.Value.Seconds;
+            if (secs != 0 || (mins % 30) != 0)
+            {
+                ModelState.AddModelError(nameof(model.Time),
+                    "Please choose a time in 30-minute steps (e.g., 9:00, 9:30, 10:00).");
                 return View(model);
-
-            // (When you have a DB) — Create and save a Booking entity here, then continue.
-            // Example (later): _db.Bookings.Add(booking); await _db.SaveChangesAsync();
-
-            var chosenService = _services.First(s => s.Id == model.ServiceId);
-            var dateText = model.Date?.ToString("dddd, MMM d, yyyy") ?? "(date)";
-            var timeText = model.Time?.ToString() ?? "(time)";
-
-            // Email subject + HTML body (safe to reuse for both customer and shop inbox).
-            string subject = $"Your {chosenService.Name} booking request";
-            string html = $@"
-                <h2>Thanks for your request, {System.Net.WebUtility.HtmlEncode(model.FullName)}!</h2>
-                <p>We received your booking:</p>
-                <ul>
-                    <li><strong>Service:</strong> {System.Net.WebUtility.HtmlEncode(chosenService.Name)}</li>
-                    <li><strong>Date:</strong> {dateText}</li>
-                    <li><strong>Time:</strong> {timeText}</li>
-                </ul>
-                <p>If you need to change anything, just reply to this email.</p>";
-
-            if (_sendEmails)
-            {
-                try
-                {
-                    // REAL EMAIL PATH (runs when Email:Send = true AND Program.cs wires IEmailSender to SmtpEmailSender).
-                    // Inside SmtpEmailSender.SendAsync we build the MailMessage:
-                    //   - From = SmtpOptions.FromAddress/FromName
-                    //   - To = model.Email
-                    //   - Subject/Body = provided below
-                    //
-                    // TIP: Add a Reply-To so customers can respond to a monitored inbox.
-                    // In SmtpEmailSender before SendMailAsync(...):
-                    //     message.ReplyToList.Add(new MailAddress("appointments@yourdomain.com", "Appointments"));
-                    //
-                    // TIP: You can also BCC the shop or send a separate notification:
-                    //     await _emailSender.SendAsync("appointments@yourdomain.com", $"New booking from {model.FullName}", html);
-
-                    await _emailSender.SendAsync(model.Email, subject, html);
-                }
-                catch (Exception)
-                {
-                    // Do not crash the booking flow. Show a friendly note.
-                    // Also log the real exception with ILogger<BookingController> in production.
-                    TempData["EmailNote"] = "We could not send an email right now, but your request was received.";
-                }
-            }
-            else
-            {
-                // DEV/temporary mode: tell the user this is screen-only confirmation.
-                TempData["EmailNote"] = "Email sending is temporarily disabled; this is a screen confirmation only.";
             }
 
-            // Pass booking details to the success page (simple approach for now).
-            TempData["CustomerName"] = model.FullName;
-            TempData["ServiceName"] = chosenService.Name;
-            TempData["DateText"] = dateText;
-            TempData["TimeText"] = timeText;
+            // Validate service
+            var type = await _db.AppointmentTypes
+                                .FirstOrDefaultAsync(t => t.TypeID == model.TypeID && t.IsActive);
+            if (type == null)
+            {
+                ModelState.AddModelError(nameof(model.TypeID), "Please pick a valid service.");
+                return View(model);
+            }
+
+            // Validate stylist
+            var stylist = await _db.Stylists
+                                   .Include(s => s.User)
+                                   .FirstOrDefaultAsync(s => s.StylistID == model.StylistID && s.IsActive);
+            if (stylist == null)
+            {
+                ModelState.AddModelError(nameof(model.StylistID), "Please pick a valid stylist.");
+                return View(model);
+            }
+
+            // Build local → UTC window
+            var localDateTime = model.Date!.Value.Date + model.Time.Value;
+            var startUtc = TimeZoneInfo.ConvertTimeToUtc(localDateTime, _localTz);
+            var endUtc = startUtc.AddMinutes(type.DurationMinutes);
+
+            // Find or create client (no auth yet)
+            var client = await _db.Users.FirstOrDefaultAsync(u => u.Email == model.Email);
+            if (client == null)
+            {
+                client = new User
+                {
+                    FullName = model.FullName,
+                    Email = model.Email,
+                    Phone = model.Phone,
+                    Role = "Client",
+                    PasswordHash = "BOOKING_PORTAL_PLACEHOLDER",
+                    CreatedAtUtc = DateTime.UtcNow,
+                    IsActive = true
+                };
+                _db.Users.Add(client);
+                await _db.SaveChangesAsync();
+            }
+
+            // Overlap check for the SELECTED stylist ONLY
+            bool conflict = await _db.Appointments.AnyAsync(a =>
+                a.StylistID == stylist.StylistID &&
+                a.Status != "Cancelled" &&
+                a.Status != "NoShow" &&
+                a.StartDateTimeUtc < endUtc &&
+                (a.EndDateTimeUtc ?? a.StartDateTimeUtc) > startUtc
+            );
+
+            if (conflict)
+            {
+                TempData["ServiceName"] = type.Name;
+                TempData["StylistName"] = stylist.User?.FullName ?? $"Stylist #{stylist.StylistID}";
+                var localStart = TimeZoneInfo.ConvertTimeFromUtc(startUtc, _localTz);
+                TempData["DateText"] = localStart.ToString("dddd, MMM d, yyyy");
+                TempData["TimeText"] = localStart.ToString("h:mm tt");
+                return RedirectToAction(nameof(Unavailable));
+            }
+
+            // Create appointment
+            var appt = new Appointment
+            {
+                ClientUserID = client.UserID,
+                StylistID = stylist.StylistID,
+                TypeID = type.TypeID,
+                StartDateTimeUtc = startUtc,
+                EndDateTimeUtc = endUtc,
+                Status = "Confirmed",
+                ClientNote = model.Note,
+                CreatedAtUtc = DateTime.UtcNow
+            };
+            _db.Appointments.Add(appt);
+            await _db.SaveChangesAsync();
+
+            // Confirmation screen
+            var local = TimeZoneInfo.ConvertTimeFromUtc(startUtc, _localTz);
+            TempData["CustomerName"] = client.FullName;
+            TempData["ServiceName"] = type.Name;
+            TempData["StylistName"] = stylist.User?.FullName ?? $"Stylist #{stylist.StylistID}";
+            TempData["DateText"] = local.ToString("dddd, MMM d, yyyy");
+            TempData["TimeText"] = local.ToString("h:mm tt");
+            TempData["ConfirmId"] = $"A{appt.AppointmentID:D6}";
 
             return RedirectToAction(nameof(Success));
         }
 
-        public IActionResult Success()
+        public IActionResult Success() => View();
+        public IActionResult Unavailable() => View();
+
+        private async Task LoadDropdowns()
         {
-            // Renders Views/Booking/Success.cshtml
-            return View();
+            var types = await _db.AppointmentTypes
+                                 .Where(t => t.IsActive)
+                                 .OrderBy(t => t.Name)
+                                 .ToListAsync();
+            ViewBag.ServiceList = new SelectList(types, "TypeID", "Name");
+
+            // Show stylist display names (pull from linked Users)
+            var stylists = await _db.Stylists
+                                    .Include(s => s.User)
+                                    .Where(s => s.IsActive)
+                                    .OrderBy(s => s.User!.FullName)
+                                    .Select(s => new { s.StylistID, Name = s.User!.FullName })
+                                    .ToListAsync();
+            ViewBag.StylistList = new SelectList(stylists, "StylistID", "Name");
         }
     }
 }

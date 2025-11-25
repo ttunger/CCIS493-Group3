@@ -1,0 +1,13 @@
+﻿@{
+    ViewData["Title"] = "Time Unavailable";
+    var service = TempData["ServiceName"] as string ?? "Service";
+    var stylist = TempData["StylistName"] as string ?? "Selected stylist";
+    var date = TempData["DateText"] as string ?? "(date)";
+    var time = TempData["TimeText"] as string ?? "(time)";
+}
+<div class="mt-4">
+    <h1>That time is unavailable</h1>
+    <p>@stylist isn't available for <strong>@service</strong> on <strong>@date</strong> at <strong>@time</strong>.</p>
+    <p>Please pick another time or stylist.</p>
+    <a class="btn btn-outline-primary mt-3" asp-controller="Booking" asp-action="Index">Try again</a>
+</div>

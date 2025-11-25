@@ -1,41 +1,31 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-
 namespace HaircutBookingSystem.Models
 {
     public class BookingRequest
     {
-        [Required(ErrorMessage = "Please choose a service.")]
-        [Display(Name = "Service")]
-        public int ServiceId { get; set; }
+        [Required, Display(Name = "Service")]
+        public int TypeID { get; set; }
 
+        [Required, Display(Name = "Stylist")]
+        public int StylistID { get; set; }
 
-        [Required(ErrorMessage = "Please choose a date.")]
-        [DataType(DataType.Date)]
-        [Display(Name = "Preferred Date")]
+        [Required, DataType(DataType.Date), Display(Name = "Preferred Date")]
         public DateTime? Date { get; set; }
 
-
-        [Required(ErrorMessage = "Please choose a time.")]
-        [DataType(DataType.Time)]
-        [Display(Name = "Preferred Time")]
+        [Required, DataType(DataType.Time), Display(Name = "Preferred Time")]
         public TimeSpan? Time { get; set; }
 
+        [Required, StringLength(60), Display(Name = "Full Name")]
+        public string FullName { get; set; } = "";
 
-        [Required]
-        [StringLength(60)]
-        [Display(Name = "Full Name")]
-        public string FullName { get; set; } = string.Empty;
+        [Required, EmailAddress, Display(Name = "Email Address")]
+        public string Email { get; set; } = "";
 
-
-        [Required]
-        [EmailAddress]
-        [Display(Name = "Email Address")]
-        public string Email { get; set; } = string.Empty;
-
-
-        [Phone]
-        [Display(Name = "Phone (optional)")]
+        [Phone, Display(Name = "Phone (optional)")]
         public string? Phone { get; set; }
+
+        [StringLength(500), Display(Name = "Notes (optional)")]
+        public string? Note { get; set; }
     }
 }
