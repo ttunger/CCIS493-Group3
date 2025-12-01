@@ -1,20 +1,27 @@
-﻿using HaircutBookingSystem.Data;
+using HaircutBookingSystem.Models;
+using HaircutBookingSystem.Services;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// MVC
+// Register services (must happen before Build)
 builder.Services.AddControllersWithViews();
 
-// EF Core
-builder.Services.AddDbContext<SalonContext>(options =>
+// Bind SMTP settings from configuration
+var smtpSection = builder.Configuration.GetSection("Smtp");
+var smtpOptions = smtpSection.Get<SmtpOptions>() ?? new SmtpOptions();
+builder.Services.AddSingleton(smtpOptions);
+builder.Services.AddTransient<IEmailSender, SmtpEmailSender>();
+
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 var app = builder.Build();
 
+// Configure middleware (after Build)
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Error");
+    app.UseExceptionHandler("/Home/Error");
     app.UseHsts();
 }
 
@@ -22,7 +29,10 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
 
-// Default route → Booking/Index
+app.UseAuthentication(); // if using Identity
+app.UseAuthorization();
+
+// Default route goes to Booking/Index
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Booking}/{action=Index}/{id?}");
