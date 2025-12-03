@@ -1,6 +1,7 @@
 Name: Prashum K.C.
-Course: CISS 493 � Capstone
+Course: CISS 493 – Capstone
 Team: Group 3
+
 Sprint: Sprint 1
 
 What I submitted:
@@ -16,3 +17,24 @@ What is not working / still to be done:
 - The web application is not yet connected to this database (no connection string or DbContext wired up yet).
 - No seed data for real users, stylists, or services beyond the schema.
 - No authentication or real password hashing implemented yet; PasswordHash is a placeholder column for now.
+
+
+Sprint 2
+
+What I completed:
+- Improved input validation for bookings on both frontend and backend.
+- Added clear error messages for invalid service, stylist, date, and time selections.
+- Enforced 30-minute time increments and prevented past-date bookings.
+- Updated BookingController.cs with stronger ModelState checks and safer logic.
+- Added RemindersResult.cshtml for testing the reminder feature from Sprint 1.
+- Updated Index.cshtml so validation messages display correctly.
+
+What should be working:
+- Booking form now blocks invalid inputs and provides clear feedback.
+- Backend rejects malformed requests or missing fields.
+- Reminder test page shows upcoming appointments within 24 hours.
+
+What is not working / still to be done:
+- No actual email sending yet (reminders only displayed for testing).
+- No real database integration — system still uses in-memory lists.
+- Reminder logic will need to be connected to real appointments after DB is added.
