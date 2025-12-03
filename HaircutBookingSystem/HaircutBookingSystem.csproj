@@ -7,11 +7,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="C:\Users\Matth\OneDrive\Documents\Columbia College\CISS 491 CAPSTONE\HaircutBookingSystem\Removed Files\Entities.cs" Link="Entities.cs" />
-    <Compile Include="C:\Users\Matth\OneDrive\Documents\Columbia College\CISS 491 CAPSTONE\HaircutBookingSystem\Removed Files\SalonContext.cs" Link="SalonContext.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.22" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.0">
       <PrivateAssets>all</PrivateAssets>
