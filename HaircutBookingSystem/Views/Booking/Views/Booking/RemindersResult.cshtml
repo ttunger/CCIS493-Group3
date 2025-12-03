@@ -1,0 +1,42 @@
+@{
+    ViewData["Title"] = "Reminder Check Results";
+}
+
+<h2 class="mt-4 mb-3">Reminder Check Results</h2>
+
+<div class="card p-4 shadow-sm">
+    <p class="text-muted">
+        Here are the appointments happening within the next 24 hours.
+    </p>
+
+    @if (ViewBag.Upcoming == null || !ViewBag.Upcoming.Any())
+    {
+        <p class="text-danger fw-bold">No reminders to send at this time.</p>
+    }
+    else
+    {
+        <table class="table table-bordered mt-3">
+            <thead class="table-light">
+                <tr>
+                    <th>Date</th>
+                    <th>Time</th>
+                    <th>Stylist</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var slot in ViewBag.Upcoming)
+            {
+                <tr>
+                    <td>@slot.Date</td>
+                    <td>@slot.Time</td>
+                    <td>@slot.StylistId</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    }
+</div>
+
+<div class="mt-4">
+    <a asp-action="Index" class="btn btn-primary">Back to Booking</a>
+</div>
