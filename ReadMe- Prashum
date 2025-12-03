@@ -1,0 +1,18 @@
+Name: Prashum K.C.
+Course: CISS 493 – Capstone
+Team: Group 3
+Sprint: Sprint 1
+
+What I submitted:
+- Added the initial database schema script `01_core_tables.sql` under the Database folder for the HaircutBookingSystem.
+- The script creates the core tables: Users, Stylists, AppointmentTypes, Appointments, and StylistNotes.
+- Ran the script on my local SQL Server instance to create the HaircutBookingSystem database and verified there were no SQL errors.
+
+What should be working:
+- Primary keys, foreign keys, and basic constraints (like the Role check and status values) are in place.
+- The structure supports booking appointments, linking clients to stylists, and storing stylist notes.
+
+What is not working / still to be done:
+- The web application is not yet connected to this database (no connection string or DbContext wired up yet).
+- No seed data for real users, stylists, or services beyond the schema.
+- No authentication or real password hashing implemented yet; PasswordHash is a placeholder column for now.
