@@ -1,5 +1,14 @@
-﻿<h2>Admin Management Page</h2>
-@{
-    <p><a asp-action="AllRole">Manage Roles</a></p>
-    <p><a asp-action="AllUser">Manage Users</a></p>
+﻿@{
+    ViewData["Title"] = "Admin Management";
 }
+
+<div class="auth-wrap mt-4">
+    <div class="auth-card" style="max-width: 720px;">
+        <h1>Admin Management</h1>
+
+        <div class="d-grid gap-2">
+            <a class="btn btn-primary btn-cta" asp-action="AllRole">Manage Roles</a>
+            <a class="btn btn-primary btn-cta" asp-controller="Account" asp-action="AllUser">Manage Users</a>
+        </div>
+    </div>
+</div>

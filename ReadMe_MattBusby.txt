@@ -13,5 +13,12 @@ UserStory6 - Complete
   - Clients will be informed if the appointment slot is unavailable.
   - Appointments are saved to DB
 
-**Notes - SQL Query for seeding added to GitHub for easy LocalDB creation for testing:
-  - 02_seed_min_data.sql
+UserStory10 - Working
+  - Root account created with a switch for disabling the account
+  - This is in place for testing and building the initial Owner/Admin account
+
+UserStory14 - Complete
+  - Users can easily navigate the page.
+  - Contact Information added
+  - Service information added
+  - CSS formatting added
